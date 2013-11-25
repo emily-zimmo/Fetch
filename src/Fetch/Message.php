@@ -160,7 +160,7 @@ class Message
      *
      * @var string
      */
-    public static $charset = 'UTF-8//TRANSLIT';
+    public static $charset = 'UTF-8';
 
     /**
      * This constructor takes in the uid for the message and the Imap class representing the mailbox the
@@ -190,25 +190,29 @@ class Message
 
         $messageOverview = $this->getOverview();
 
-        $this->subject = $messageOverview->subject;
+        $this->subject = $this->decode($messageOverview->subject, 'mime-header');
         $this->date    = strtotime($messageOverview->date);
         $this->size    = $messageOverview->size;
 
-        foreach (self::$flagTypes as $flag)
+        foreach (self::$flagTypes as $flag) {
             $this->status[$flag] = ($messageOverview->$flag == 1);
+        }
 
         /* Next load in all of the header information */
 
         $headers = $this->getHeaders();
 
-        if (isset($headers->to))
+        if (isset($headers->to)) {
             $this->to = $this->processAddressObject($headers->to);
+        }
 
-        if (isset($headers->cc))
+        if (isset($headers->cc)) {
             $this->cc = $this->processAddressObject($headers->cc);
+        }
 
-        if (isset($headers->bcc))
+        if (isset($headers->bcc)) {
             $this->bcc = $this->processAddressObject($headers->bcc);
+        }
 
         $this->from    = $this->processAddressObject($headers->from);
         $this->replyTo = isset($headers->reply_to) ? $this->processAddressObject($headers->reply_to) : $this->from;
@@ -222,8 +226,9 @@ class Message
             $this->processStructure($structure);
         } else {
             // multipart
-            foreach ($structure->parts as $id => $part)
+            foreach ($structure->parts as $id => $part) {
                 $this->processStructure($part, $id + 1);
+            }
         }
     }
 
@@ -334,22 +339,25 @@ class Message
     {
         $addressTypes = array('to', 'cc', 'bcc', 'from', 'reply-to');
 
-        if (!in_array($type, $addressTypes) || !isset($this->$type) || count($this->$type) < 1)
+        if (!in_array($type, $addressTypes) || !isset($this->$type) || count($this->$type) < 1) {
             return false;
+        }
 
 
         if (!$asString) {
-            if ($type == 'from')
+            if ($type == 'from') {
                 return $this->from[0];
+            }
 
             return $this->$type;
         } else {
             $outputString = '';
             foreach ($this->$type as $address) {
-                if (isset($set))
+                if (isset($set)) {
                     $outputString .= ', ';
-                if (!isset($set))
+                } else {
                     $set = true;
+                }
 
                 $outputString .= isset($address['name']) ?
                     $address['name'] . ' <' . $address['address'] . '>'
@@ -469,8 +477,9 @@ class Message
      */
     public static function decode($data, $encoding)
     {
-        if (!is_numeric($encoding))
+        if (!is_numeric($encoding)) {
             $encoding = strtolower($encoding);
+        }
 
         switch ($encoding) {
             case 'quoted-printable':
@@ -480,7 +489,21 @@ class Message
             case 'base64':
             case 3:
                 return base64_decode($data);
+            case 'mime-header':
+                $decoded = imap_mime_header_decode($data);
+                
+                $data = '';
+                foreach ($decoded as $decodedText) {
+                    if ($decodedText->charset == 'default') {
+                        $data .= $decodedText->text;
+                    } else if ($decodedText->charset != self::$charset) {
+                        $data .= iconv($decodedText->charset, self::$charset, $decodedText->text);
+                    } else {
+                        $data .= $decodedText->text;
+                    }
+                }
 
+                return $data;
             default:
                 return $data;
         }
@@ -531,13 +554,17 @@ class Message
     public static function getParametersFromStructure($structure)
     {
         $parameters = array();
-        if (isset($structure->parameters))
-            foreach ($structure->parameters as $parameter)
+        if (isset($structure->parameters)) {
+            foreach ($structure->parameters as $parameter) {
                 $parameters[strtolower($parameter->attribute)] = $parameter->value;
+            }
+        }
 
-        if (isset($structure->dparameters))
-            foreach ($structure->dparameters as $parameter)
+        if (isset($structure->dparameters)) {
+            foreach ($structure->dparameters as $parameter) {
                 $parameters[strtolower($parameter->attribute)] = $parameter->value;
+            }
+        }
 
         return $parameters;
     }
@@ -552,14 +579,16 @@ class Message
     protected function processAddressObject($addresses)
     {
         $outputAddresses = array();
-        if (is_array($addresses))
+        if (is_array($addresses)) {
             foreach ($addresses as $address) {
                 $currentAddress            = array();
                 $currentAddress['address'] = $address->mailbox . '@' . $address->host;
-                if (isset($address->personal))
-                    $currentAddress['name'] = $address->personal;
+                if (isset($address->personal)) {
+                    $currentAddress['name'] = $this->decode($address->personal, 'mime-header');
+                }
                 $outputAddresses[] = $currentAddress;
             }
+        }
 
         return $outputAddresses;
     }
@@ -583,16 +612,19 @@ class Message
      */
     public function getAttachments($filename = null)
     {
-        if (!isset($this->attachments) || count($this->attachments) < 1)
+        if (!isset($this->attachments) || count($this->attachments) < 1) {
             return false;
+        }
 
-        if (!isset($filename))
+        if (!isset($filename)) {
             return $this->attachments;
+        }
 
         $results = array();
         foreach ($this->attachments as $attachment) {
-            if ($attachment->getFileName() == $filename)
+            if ($attachment->getFileName() == $filename) {
                 $results[] = $attachment;
+            }
         }
 
         switch (count($results)) {
@@ -629,8 +661,9 @@ class Message
      */
     public function setFlag($flag, $enable = true)
     {
-        if (!in_array($flag, self::$flagTypes) || $flag == 'recent')
+        if (!in_array($flag, self::$flagTypes) || $flag == 'recent') {
             throw new \InvalidArgumentException('Unable to set invalid flag "' . $flag . '"');
+        }
 
         $flag = '\\' . ucfirst($flag);
 
