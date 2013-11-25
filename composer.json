@@ -1,8 +1,8 @@
 {
-  "name": "tedivm/fetch",
+  "name": "emily-zimmo/fetch",
   "description": "A PHP IMAP Library",
   "keywords": ["email","imap","pop3"],
-  "homepage": "http://github.com/tedivm/Fetch",
+  "homepage": "http://github.com/emily-zimmo/Fetch",
   "type": "library",
   "license": "BSD-3-Clause",
   "authors": [

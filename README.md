@@ -10,17 +10,6 @@ modern php features. While the project is in flux I encourage you to try it out,
 but be careful about using it in a production environment without proper
 testing.
 
-Installation
-============
-
-The most easy way to install the library is via composer. To do so, you have to do
-the following:
-
-    php composer.phar require tedivm/fetch
-
-Composer will then ask you which version you want to install. Until there are stable
-versions, by using "@dev" it'll install the latest version.
-
 Sample Usage
 ============
 
