@@ -18,7 +18,7 @@ namespace Fetch;
  * @package Fetch
  * @author  Robert Hafner <tedivm@tedivm.com>
  */
-class Server
+class Server implements \Iterator
 {
     /**
      * When SSL isn't compiled into PHP we need to make some adjustments to prevent soul crushing annoyances.
@@ -108,6 +108,18 @@ class Server
      * @var string
      */
     protected $service = 'imap';
+    
+    /**
+     * current iteration position
+     * @var int
+     */
+    protected $iterationPos = 0;
+
+    /**
+     * maximum iteration position (= message count)
+     * @var null|int
+     */
+    protected $iterationMax = null;
 
     /**
      * This constructor takes the location and service thats trying to be connected to as its arguments.
@@ -229,6 +241,18 @@ class Server
             $this->setImapStream();
 
         return $this->imapStream;
+    }
+    
+    /**
+     * Close the connection
+     * 
+     * @param bool $expunge
+     */
+    public function close($expunge = false)
+    {
+        if  (isset($this->imapStream)) {
+            imap_close($this->imapStream, ($expunge ? CL_EXPUNGE : 0));
+        }
     }
 
     /**
@@ -364,6 +388,19 @@ class Server
 
         return $messages;
     }
+    
+    /**
+     * Get a message.
+     *
+     * @param $id int number of message
+     * @return Message
+     */
+    public function getMessage($id)
+    {
+        $stream = $this->getImapStream();
+        $uid = imap_uid($stream, $id);
+        return new Message($uid, $this);
+    }
 
     /**
      * This function removes all of the messages flagged for deletion from the mailbox.
@@ -401,5 +438,63 @@ class Server
     public function createMailBox($mailbox)
     {
         return imap_createmailbox($this->getImapStream(), $this->getServerSpecification() . $mailbox);
+    }
+
+    /**
+     * Iterator::rewind()
+     *
+     * Rewind always gets the new count from the storage. Thus if you use
+     * the interfaces and your scripts take long you should use reset()
+     * from time to time.
+     */
+    public function rewind()
+    {
+       $this->iterationMax = $this->numMessages();
+       $this->iterationPos = 1;
+    }
+
+
+    /**
+     * Iterator::current()
+     *
+     * @return Message current message
+     */
+    public function current()
+    {
+       return $this->getMessage($this->iterationPos);
+    }
+
+
+    /**
+     * Iterator::key()
+     *
+     * @return int id of current position
+     */
+    public function key()
+    {
+       return $this->iterationPos;
+    }
+
+
+    /**
+     * Iterator::next()
+     */
+    public function next()
+    {
+       ++$this->iterationPos;
+    }
+
+
+    /**
+     * Iterator::valid()
+     *
+     * @return bool
+     */
+    public function valid()
+    {
+       if ($this->iterationMax === null) {
+         $this->iterationMax = $this->numMessages();
+       }
+       return $this->iterationPos && $this->iterationPos <= $this->iterationMax;
     }
 }
